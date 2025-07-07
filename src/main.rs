@@ -81,6 +81,23 @@ fn deck() -> Json<Vec<Deck>> {
                 },
             ],
         },
+        Deck {
+            id: "3".into(),
+            name: "Deck 3".into(),
+            description: "Description for Deck 3".into(),
+            cards: vec![
+                Card {
+                    id: "5".into(),
+                    front: "Front 5".into(),
+                    back: "Back 5".into(),
+                },
+                Card {
+                    id: "6".into(),
+                    front: "Front 6".into(),
+                    back: "Back 6".into(),
+                },
+            ],
+        },
     ])
 }
 
