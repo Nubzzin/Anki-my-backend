@@ -1,12 +1,19 @@
 #[macro_use]
 extern crate rocket;
 
+use db::Db;
+use dotenv::dotenv;
+use rocket::http::ext::IntoCollection;
 use rocket::serde::{Deserialize, Serialize, json::Json};
 use rocket::{
     Request, Response,
     fairing::{Fairing, Info, Kind},
     http::Header,
 };
+use sqlx::Row;
+use sqlx::postgres::PgRow;
+
+mod db;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Deck {
@@ -106,9 +113,45 @@ fn deck_id(id: String) -> String {
     format!("Hello, deck {}!", id)
 }
 
-#[launch]
-fn rocket() -> _ {
-    rocket::build()
+#[derive(Debug, Serialize, Deserialize)]
+struct TestRow {
+    id: i32,
+}
+
+// Test
+#[get("/rows")]
+async fn rows() -> Json<Vec<TestRow>> {
+    let db = Db::connect().await.unwrap();
+    let rows = sqlx::query("SELECT * FROM test")
+        .map(|row: PgRow| {
+            let id = row.try_get("id").unwrap();
+            TestRow { id }
+        })
+        .fetch_all(db.pool())
+        .await
+        .unwrap();
+
+    Json(rows)
+}
+
+#[rocket::main]
+async fn main() -> Result<(), Box<rocket::Error>> {
+    dotenv().ok();
+
+    let db = Db::connect().await.unwrap();
+
+    let rows = sqlx::query("SELECT * FROM test")
+        .fetch_all(db.pool())
+        .await
+        .unwrap();
+
+    println!("Row: {:#?}", rows);
+
+    let _rocket = rocket::build()
         .attach(CORS)
-        .mount("/", routes![deck, deck_id])
+        .mount("/", routes![deck, deck_id, rows])
+        .launch()
+        .await?;
+
+    Ok(())
 }
