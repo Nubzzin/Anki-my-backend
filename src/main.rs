@@ -3,60 +3,13 @@ extern crate rocket;
 
 use db::Db;
 use dotenv::dotenv;
-use rocket::http::ext::IntoCollection;
-use rocket::serde::{Deserialize, Serialize, json::Json};
-use rocket::{
-    Request, Response,
-    fairing::{Fairing, Info, Kind},
-    http::Header,
-};
+use models::{CORS, Card, Deck, User};
+use rocket::serde::json::Json;
 use sqlx::Row;
 use sqlx::postgres::PgRow;
 
 mod db;
-
-#[derive(Debug, Serialize, Deserialize)]
-struct User {
-    id: String,
-    name: String,
-    password: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Deck {
-    id: String,
-    name: String,
-    description: String,
-    cards: Vec<Card>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Card {
-    id: String,
-    front: String,
-    back: String,
-}
-
-pub struct CORS;
-
-#[rocket::async_trait]
-impl Fairing for CORS {
-    fn info(&self) -> Info {
-        Info {
-            name: "Add CORS headers",
-            kind: Kind::Response,
-        }
-    }
-
-    async fn on_response<'r>(&self, _req: &'r Request<'_>, res: &mut Response<'r>) {
-        res.set_header(Header::new("Access-Control-Allow-Origin", "*"));
-        res.set_header(Header::new(
-            "Access-Control-Allow-Methods",
-            "POST, GET, PATCH, OPTIONS",
-        ));
-        res.set_header(Header::new("Access-Control-Allow-Headers", "*"));
-    }
-}
+mod models;
 
 #[get("/deck")]
 fn deck() -> Json<Vec<Deck>> {
@@ -124,12 +77,16 @@ fn deck_id(id: String) -> String {
 #[get("/rows")]
 async fn rows() -> Json<Vec<User>> {
     let db = Db::connect().await.unwrap();
-    let rows = sqlx::query("SELECT * FROM test")
+    let rows = sqlx::query("SELECT * FROM users")
         .map(|row: PgRow| {
             let id = row.try_get("id").unwrap();
-            let name = row.try_get("name").unwrap();
+            let username = row.try_get("username").unwrap();
             let password = row.try_get("password").unwrap();
-            User { id, name, password }
+            User {
+                id,
+                username,
+                password,
+            }
         })
         .fetch_all(db.pool())
         .await
