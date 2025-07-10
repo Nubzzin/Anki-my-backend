@@ -16,6 +16,13 @@ use sqlx::postgres::PgRow;
 mod db;
 
 #[derive(Debug, Serialize, Deserialize)]
+struct User {
+    id: String,
+    name: String,
+    password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct Deck {
     id: String,
     name: String,
@@ -113,19 +120,16 @@ fn deck_id(id: String) -> String {
     format!("Hello, deck {}!", id)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct TestRow {
-    id: i32,
-}
-
 // Test
 #[get("/rows")]
-async fn rows() -> Json<Vec<TestRow>> {
+async fn rows() -> Json<Vec<User>> {
     let db = Db::connect().await.unwrap();
     let rows = sqlx::query("SELECT * FROM test")
         .map(|row: PgRow| {
             let id = row.try_get("id").unwrap();
-            TestRow { id }
+            let name = row.try_get("name").unwrap();
+            let password = row.try_get("password").unwrap();
+            User { id, name, password }
         })
         .fetch_all(db.pool())
         .await
