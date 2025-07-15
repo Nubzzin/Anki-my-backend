@@ -1,14 +1,12 @@
+use jsonwebtoken::{DecodingKey, Validation, decode};
 use rocket::http::Status;
 use rocket::{
     Request, Response,
     fairing::{Fairing, Info, Kind},
     http::Header,
-    request,
     request::{FromRequest, Outcome},
     serde::{Deserialize, Serialize},
 };
-
-use crate::utils::verify_token;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
@@ -76,18 +74,27 @@ pub struct AuthUser {
 impl<'r> FromRequest<'r> for AuthUser {
     type Error = ();
 
-    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, ()> {
-        let secret = "your_jwt_secret"; // Load from .env in real apps
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let auth_header = request.headers().get_one("Authorization");
 
-        let token = req
-            .headers()
-            .get_one("Authorization")
-            .and_then(|h| h.strip_prefix("Bearer "))
-            .map(str::to_string);
+        let token = match auth_header {
+            Some(header) if header.starts_with("Bearer ") => &header[7..],
+            _ => return Outcome::Forward(Status::Unauthorized),
+        };
 
-        match token.and_then(|t| verify_token(&t, secret)) {
-            Some(user_id) => Outcome::Success(AuthUser { user_id }),
-            None => Outcome::Error((Status::Unauthorized, ())),
+        let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "default_secret".into());
+
+        let decoded = decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(secret.as_bytes()),
+            &Validation::default(),
+        );
+
+        match decoded {
+            Ok(data) => Outcome::Success(AuthUser {
+                user_id: data.claims.sub,
+            }),
+            Err(_) => Outcome::Forward(Status::Unauthorized),
         }
     }
 }

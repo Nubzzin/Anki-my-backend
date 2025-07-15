@@ -5,8 +5,8 @@ use std::env;
 
 use db::Db;
 use dotenv::dotenv;
-use models::{CORS, Card, Deck, User};
-use rocket::serde::json::Json;
+use models::{AuthUser, CORS, Deck, User};
+use rocket::{http::Status, serde::json::Json};
 use sqlx::{Row, postgres::PgRow};
 
 use crate::{
@@ -48,11 +48,12 @@ async fn login(data: Json<LoginRequest>) -> Json<LoginResponse> {
 
     Json(LoginResponse { token })
 }
+
 #[get("/deck")]
 async fn deck() -> Json<Vec<Deck>> {
     let db = Db::connect().await.unwrap();
     let decks = sqlx::query("SELECT * FROM decks" /* WHERE user_id = $1*/)
-        // .bind("a81bc81b-dead-4e5d-abff-90865d1e13b1") // Example
+        // .bind("a81bc81b-dead-4e5d-abff-90865d1e13b1") // Exmple
         .map(|row: PgRow| {
             let id = row.try_get("id").unwrap();
             let name = row.try_get("name").unwrap();
@@ -108,6 +109,19 @@ async fn rows() -> Json<Vec<User>> {
     Json(rows)
 }
 
+#[get("/protected")]
+fn protected(user: Option<AuthUser>) -> Result<String, Status> {
+    match user {
+        Some(u) => Ok(format!("Hello, user with id: {}", u.user_id)),
+        None => Err(Status::Unauthorized),
+    }
+}
+
+#[options("/<_..>")]
+fn all_options() -> &'static str {
+    ""
+}
+
 #[rocket::main]
 async fn main() -> Result<(), Box<rocket::Error>> {
     dotenv().ok();
@@ -123,7 +137,7 @@ async fn main() -> Result<(), Box<rocket::Error>> {
 
     let _rocket = rocket::build()
         .attach(CORS)
-        .mount("/", routes![deck, rows, login])
+        .mount("/", routes![deck, rows, login, all_options, protected])
         .launch()
         .await?;
 
