@@ -9,10 +9,10 @@ use models::{AuthUser, CORS, Deck, User};
 use rocket::{http::Status, serde::json::Json};
 use sqlx::{Row, postgres::PgRow};
 
-use crate::{
-    models::{LoginRequest, LoginResponse},
-    utils::generate_token,
-};
+use models::{LoginRequest, LoginResponse};
+use utils::generate_token;
+
+use crate::models::RegisterRequest;
 
 mod db;
 mod models;
@@ -47,6 +47,52 @@ async fn login(data: Json<LoginRequest>) -> Json<LoginResponse> {
     let token = generate_token(user_id.as_ref(), secret.as_ref());
 
     Json(LoginResponse { token })
+}
+
+#[post("/register", data = "<data>")]
+async fn register(data: Json<RegisterRequest>) -> Result<Json<LoginResponse>, Status> {
+    use uuid::Uuid;
+
+    let db = Db::connect()
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    if data.username.trim().is_empty() || data.password.trim().is_empty() {
+        return Err(Status::BadRequest);
+    }
+
+    let existing_user =
+        sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE username = $1")
+            .bind(&data.username)
+            .fetch_optional(db.pool())
+            .await
+            .map_err(|_| Status::InternalServerError)?;
+
+    if existing_user.is_some() {
+        return Err(Status::Conflict);
+    }
+
+    let hashed_password = bcrypt::hash(&data.password, bcrypt::DEFAULT_COST)
+        .map_err(|_| Status::InternalServerError)?;
+
+    let user_id = Uuid::new_v4().to_string();
+
+    let result = sqlx::query("INSERT INTO users (id, username, password) VALUES ($1, $2, $3)")
+        .bind(&user_id)
+        .bind(&data.username)
+        .bind(&hashed_password)
+        .execute(db.pool())
+        .await;
+
+    if let Err(e) = result {
+        eprintln!("Failed to create user: {:?}", e);
+        return Err(Status::InternalServerError);
+    }
+
+    let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let token = generate_token(&user_id, &secret);
+
+    Ok(Json(LoginResponse { token }))
 }
 
 #[get("/deck")]
@@ -137,7 +183,10 @@ async fn main() -> Result<(), Box<rocket::Error>> {
 
     let _rocket = rocket::build()
         .attach(CORS)
-        .mount("/", routes![deck, rows, login, all_options, protected])
+        .mount(
+            "/",
+            routes![deck, rows, login, register, all_options, protected],
+        )
         .launch()
         .await?;
 
