@@ -22,11 +22,13 @@ mod models;
 mod utils;
 
 #[post("/login", data = "<data>")]
-async fn login(data: Json<LoginRequest>) -> Json<LoginResponse> {
-    let db = Db::connect().await.unwrap();
-    let user = sqlx::query("SELECT * FROM users WHERE username = $1 AND password = $2")
+async fn login(data: Json<LoginRequest>) -> Result<Json<LoginResponse>, Status> {
+    let db = Db::connect()
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    let user = sqlx::query("SELECT * FROM users WHERE username = $1")
         .bind(&data.username)
-        .bind(&data.password)
         .map(|row: PgRow| {
             let id = row.try_get("id").unwrap();
             let username = row.try_get("username").unwrap();
@@ -39,17 +41,24 @@ async fn login(data: Json<LoginRequest>) -> Json<LoginResponse> {
         })
         .fetch_optional(db.pool())
         .await
-        .unwrap();
+        .map_err(|_| Status::InternalServerError)?;
+
+    let user = match user {
+        Some(u) => u,
+        None => return Err(Status::Unauthorized),
+    };
+
+    let is_valid =
+        bcrypt::verify(&data.password, &user.password).map_err(|_| Status::InternalServerError)?;
+
+    if !is_valid {
+        return Err(Status::Unauthorized);
+    }
 
     let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let token = generate_token(&user.id, &secret);
 
-    let user_id = match user {
-        Some(user) => user.id,
-        None => return Json(LoginResponse { token: "".into() }),
-    };
-    let token = generate_token(user_id.as_ref(), secret.as_ref());
-
-    Json(LoginResponse { token })
+    Ok(Json(LoginResponse { token }))
 }
 
 #[post("/register", data = "<data>")]
@@ -118,7 +127,7 @@ async fn deck(user: AuthUser) -> Result<Json<Vec<Deck>>, Status> {
     Ok(Json(decks))
 }
 
-#[get("/card/<deck_id>")]
+#[get("/deck/<deck_id>/card")]
 async fn cards_deck(deck_id: String, user: AuthUser) -> Result<Json<Vec<Card>>, Status> {
     let db = Db::connect()
         .await

@@ -3,7 +3,7 @@ use jsonwebtoken::{EncodingKey, Header, encode};
 
 pub fn generate_token(user_id: &str, secret: &str) -> String {
     let expiration = Utc::now()
-        .checked_add_signed(Duration::hours(1))
+        .checked_add_signed(Duration::hours(24))
         .unwrap()
         .timestamp();
 
