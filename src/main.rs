@@ -12,7 +12,10 @@ use sqlx::{Row, postgres::PgRow};
 use models::{LoginRequest, LoginResponse};
 use utils::generate_token;
 
-use crate::models::RegisterRequest;
+use crate::{
+    models::{Card, RegisterRequest},
+    utils::verify_token,
+};
 
 mod db;
 mod models;
@@ -96,10 +99,13 @@ async fn register(data: Json<RegisterRequest>) -> Result<Json<LoginResponse>, St
 }
 
 #[get("/deck")]
-async fn deck() -> Json<Vec<Deck>> {
-    let db = Db::connect().await.unwrap();
-    let decks = sqlx::query("SELECT * FROM decks" /* WHERE user_id = $1*/)
-        // .bind("a81bc81b-dead-4e5d-abff-90865d1e13b1") // Exmple
+async fn deck(user: AuthUser) -> Result<Json<Vec<Deck>>, Status> {
+    let db = Db::connect()
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    let decks = sqlx::query("SELECT * FROM decks WHERE user_id = $1")
+        .bind(&user.user_id)
         .map(|row: PgRow| {
             let id = row.try_get("id").unwrap();
             let name = row.try_get("name").unwrap();
@@ -107,9 +113,30 @@ async fn deck() -> Json<Vec<Deck>> {
         })
         .fetch_all(db.pool())
         .await
-        .expect("Failed to fetch decks");
+        .map_err(|_| Status::InternalServerError)?;
 
-    Json(decks)
+    Ok(Json(decks))
+}
+
+#[get("/card/<deck_id>")]
+async fn cards_deck(deck_id: String, user: AuthUser) -> Result<Json<Vec<Card>>, Status> {
+    let db = Db::connect()
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    let cards = sqlx::query("SELECT * FROM cards WHERE deck_id = $1")
+        .bind(&deck_id)
+        .map(|row: PgRow| {
+            let id = row.try_get("id").unwrap();
+            let front = row.try_get("front").unwrap();
+            let back = row.try_get("back").unwrap();
+            Card { id, front, back }
+        })
+        .fetch_all(db.pool())
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    Ok(Json(cards))
 }
 
 // #[get("/deck/<id>")]
@@ -185,7 +212,15 @@ async fn main() -> Result<(), Box<rocket::Error>> {
         .attach(CORS)
         .mount(
             "/",
-            routes![deck, rows, login, register, all_options, protected],
+            routes![
+                deck,
+                cards_deck,
+                rows,
+                login,
+                register,
+                all_options,
+                protected
+            ],
         )
         .launch()
         .await?;
