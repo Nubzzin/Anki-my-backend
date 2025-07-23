@@ -26,6 +26,11 @@ pub struct LoginResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct NewDeckRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
     pub username: String,

@@ -13,7 +13,7 @@ use models::{LoginRequest, LoginResponse};
 use utils::generate_token;
 
 use crate::{
-    models::{Card, RegisterRequest},
+    models::{Card, NewDeckRequest, RegisterRequest},
     utils::verify_token,
 };
 
@@ -148,6 +148,63 @@ async fn cards_deck(deck_id: String, user: AuthUser) -> Result<Json<Vec<Card>>, 
     Ok(Json(cards))
 }
 
+#[post("/deck/new", data = "<data>")]
+async fn deck_new(user: AuthUser, data: Json<NewDeckRequest>) -> Result<Json<Deck>, Status> {
+    use uuid::Uuid;
+
+    let db = Db::connect()
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    let existing_deck = sqlx::query_scalar::<_, String>("SELECT name FROM decks WHERE name = $1")
+        .bind(&data.name)
+        .fetch_optional(db.pool())
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    if existing_deck.is_some() {
+        return Err(Status::Conflict);
+    }
+
+    let deck = Deck {
+        id: Uuid::new_v4().to_string(),
+        name: data.name.clone(),
+    };
+
+    let result = sqlx::query("INSERT INTO decks (id, name, user_id) VALUES ($1, $2, $3)")
+        .bind(&deck.id)
+        .bind(&deck.name)
+        .bind(&user.user_id)
+        .execute(db.pool())
+        .await;
+
+    if let Err(e) = result {
+        eprintln!("Failed to create deck: {:?}", e);
+        return Err(Status::InternalServerError);
+    }
+
+    Ok(Json(deck))
+}
+
+#[get("/deck/shared")]
+async fn deck_shared(user: AuthUser) -> Result<Json<Vec<Deck>>, Status> {
+    let db = Db::connect()
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    let decks = sqlx::query("SELECT * FROM decks WHERE is_shared = true")
+        .map(|row: PgRow| {
+            let id = row.try_get("id").unwrap();
+            let name = row.try_get("name").unwrap();
+            Deck { id, name }
+        })
+        .fetch_all(db.pool())
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    Ok(Json(decks))
+}
+
 // #[get("/deck/<id>")]
 // async fn deck_id(id: String) -> Json<Deck> {
 //     Json(Deck {
@@ -223,6 +280,8 @@ async fn main() -> Result<(), Box<rocket::Error>> {
             "/",
             routes![
                 deck,
+                deck_new,
+                deck_shared,
                 cards_deck,
                 rows,
                 login,
