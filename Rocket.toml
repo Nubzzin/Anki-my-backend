@@ -5,4 +5,4 @@ port = 8000
 
 [release]
 log_level = "normal"
-secret_key = "your_very_secret_key"
+secret_key = { env = "ROCKET_SECRET_KEY" }
