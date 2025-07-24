@@ -7,6 +7,7 @@ use db::Db;
 use dotenv::dotenv;
 use models::{AuthUser, CORS, Deck, User};
 use rocket::{http::Status, serde::json::Json};
+use rocket_cors::CorsOptions;
 use sqlx::{Row, postgres::PgRow};
 
 use models::{LoginRequest, LoginResponse};
@@ -274,8 +275,12 @@ async fn main() -> Result<(), Box<rocket::Error>> {
 
     // println!("Row: {:#?}", rows);
 
+    let cors = CorsOptions::default()
+        .to_cors()
+        .expect("Failed to create CORS options");
+
     let _rocket = rocket::build()
-        .attach(CORS)
+        .attach(cors)
         .mount(
             "/",
             routes![
