@@ -7,8 +7,10 @@ use db::Db;
 use dotenv::dotenv;
 use models::{AuthUser, CORS, Deck, User};
 use rocket::{http::Status, serde::json::Json};
-use rocket_cors::CorsOptions;
 use sqlx::{Row, postgres::PgRow};
+
+use rocket_cors::{AllowedOrigins, CorsOptions};
+use std::str::FromStr;
 
 use models::{LoginRequest, LoginResponse};
 use utils::generate_token;
@@ -266,18 +268,34 @@ fn all_options() -> &'static str {
 async fn main() -> Result<(), Box<rocket::Error>> {
     dotenv().ok();
 
-    // let db = Db::connect().await.unwrap();
+    // Replace this with your actual frontend deployed URL:
+    let allowed_origins = AllowedOrigins::some_exact(&[
+        "https://anki-my.up.railway.app",
+        "http://localhost:3000", // for local dev (optional)
+    ]);
 
-    // let rows = sqlx::query("SELECT * FROM test")
-    //     .fetch_all(db.pool())
-    //     .await
-    //     .unwrap();
-
-    // println!("Row: {:#?}", rows);
-
-    let cors = CorsOptions::default()
-        .to_cors()
-        .expect("Failed to create CORS options");
+    let cors = CorsOptions {
+        allowed_origins,
+        allow_credentials: true,
+        allowed_methods: vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+            .into_iter()
+            .map(|m| FromStr::from_str(m).unwrap())
+            .collect(),
+        allowed_headers: rocket_cors::AllowedHeaders::some(&[
+            "Authorization",
+            "Accept",
+            "Content-Type",
+            "Origin",
+        ]),
+        expose_headers: std::collections::HashSet::from([
+            String::from("Authorization"),
+            String::from("Content-Type"),
+        ]),
+        // You can customize other options here if needed
+        ..Default::default()
+    }
+    .to_cors()
+    .expect("Failed to create CORS fairing");
 
     let _rocket = rocket::build()
         .attach(cors)
