@@ -9,7 +9,7 @@ use models::{AuthUser, CORS, Deck, User};
 use rocket::{http::Status, serde::json::Json};
 use sqlx::{Row, postgres::PgRow};
 
-use rocket_cors::{AllowedOrigins, CorsOptions};
+use rocket_cors::{AllowedHeaders, AllowedOrigins, CorsOptions};
 use std::str::FromStr;
 
 use models::{LoginRequest, LoginResponse};
@@ -259,41 +259,33 @@ fn protected(user: Option<AuthUser>) -> Result<String, Status> {
     }
 }
 
-#[options("/<_..>")]
-fn all_options() -> &'static str {
-    ""
-}
-
 #[rocket::main]
 async fn main() -> Result<(), Box<rocket::Error>> {
     dotenv().ok();
 
-    let allowed_origins = AllowedOrigins::some_exact(&[
-        "https://anki-my.up.railway.app",
-        "http://localhost:3000", // for local dev (optional)
-    ]);
+    let allowed_origins =
+        AllowedOrigins::some_exact(&["https://anki-my.up.railway.app", "http://localhost:3000"]);
 
-    let cors = CorsOptions {
-        allowed_origins,
-        allow_credentials: true,
-        allowed_methods: vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-            .into_iter()
-            .map(|m| FromStr::from_str(m).unwrap())
-            .collect(),
-        allowed_headers: rocket_cors::AllowedHeaders::some(&[
+    let cors = CorsOptions::default()
+        .allowed_origins(AllowedOrigins::some_exact(&[
+            "https://anki-my.up.railway.app",
+            "http://localhost:3000",
+        ]))
+        .allowed_methods(
+            vec!["GET", "POST", "OPTIONS"]
+                .into_iter()
+                .map(|s| s.parse().unwrap())
+                .collect(),
+        )
+        .allowed_headers(AllowedHeaders::some(&[
             "Authorization",
             "Accept",
             "Content-Type",
             "Origin",
-        ]),
-        expose_headers: std::collections::HashSet::from([
-            String::from("Authorization"),
-            String::from("Content-Type"),
-        ]),
-        ..Default::default()
-    }
-    .to_cors()
-    .expect("Failed to create CORS fairing");
+        ]))
+        .allow_credentials(true)
+        .to_cors()
+        .expect("CORS configuration failed");
 
     let _rocket = rocket::build()
         .attach(cors)
@@ -307,7 +299,6 @@ async fn main() -> Result<(), Box<rocket::Error>> {
                 rows,
                 login,
                 register,
-                all_options,
                 protected
             ],
         )
