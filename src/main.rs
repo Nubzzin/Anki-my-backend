@@ -268,7 +268,6 @@ fn all_options() -> &'static str {
 async fn main() -> Result<(), Box<rocket::Error>> {
     dotenv().ok();
 
-    // Replace this with your actual frontend deployed URL:
     let allowed_origins = AllowedOrigins::some_exact(&[
         "https://anki-my.up.railway.app",
         "http://localhost:3000", // for local dev (optional)
@@ -291,7 +290,6 @@ async fn main() -> Result<(), Box<rocket::Error>> {
             String::from("Authorization"),
             String::from("Content-Type"),
         ]),
-        // You can customize other options here if needed
         ..Default::default()
     }
     .to_cors()
