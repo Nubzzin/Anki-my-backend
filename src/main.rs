@@ -259,6 +259,11 @@ fn protected(user: Option<AuthUser>) -> Result<String, Status> {
     }
 }
 
+#[options("/<_..>")]
+fn all_options() -> &'static str {
+    ""
+}
+
 #[rocket::main]
 async fn main() -> Result<(), Box<rocket::Error>> {
     dotenv().ok();
@@ -299,7 +304,8 @@ async fn main() -> Result<(), Box<rocket::Error>> {
                 rows,
                 login,
                 register,
-                protected
+                protected,
+                all_options
             ],
         )
         .launch()
