@@ -46,3 +46,21 @@ Host your own spaced repetition learning platform — no ads, no tracking, just 
 git clone https://github.com/yourusername/anki-my.git
 cd anki-my
 ```
+
+### Setup Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env  # Set VITE_API_URL to your backend URL
+npm run dev            # Or: npm run build && npm run preview
+```
+
+### Setup Backend
+
+```bash
+cd backend
+cargo build
+# Set environment variables (e.g., DATABASE_URL, JWT_SECRET)
+cargo run
+```
