@@ -64,3 +64,5 @@ cargo build
 # Set environment variables (e.g., DATABASE_URL, JWT_SECRET)
 cargo run
 ```
+
+[Link to frontend](https://github.com/Nubzzin/Anki-my-frontend)
