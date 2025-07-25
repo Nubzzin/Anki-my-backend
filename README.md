@@ -1,5 +1,7 @@
 # Anki-My
 
+[Link to frontend](https://github.com/Nubzzin/Anki-my-frontend)
+
 A simple, modern, full-stack flashcard app inspired by Anki, built with **React**, **TypeScript**, and **Rust (Rocket)**.
 
 Host your own spaced repetition learning platform — no ads, no tracking, just study.
@@ -91,5 +93,3 @@ cargo build
 # Set environment variables (e.g., DATABASE_URL, JWT_SECRET)
 cargo run
 ```
-
-[Link to frontend](https://github.com/Nubzzin/Anki-my-frontend)
