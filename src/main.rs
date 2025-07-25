@@ -293,7 +293,7 @@ async fn main() -> Result<(), Box<rocket::Error>> {
         .expect("CORS configuration failed");
 
     let _rocket = rocket::build()
-        .attach(cors)
+        .attach(CORS)
         .mount(
             "/",
             routes![
